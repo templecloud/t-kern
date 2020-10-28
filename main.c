@@ -38,16 +38,16 @@
 // RCC AHB1 peripheral clock register (RCC_AHB1ENR). (Ref: RM0090 Reference Manual - Sec. 6.3.10).
 // * The register bit to enable the clock is Bit 3 'GPIODEN': IO port D clock enable.
 // * Create a bit mask by shifting an unsigned int 3.
-#define GPIOD_CLOCK (1U << 3)
+#define ENABLE_GPIOD_CLOCK (1U << 3)
 
 // GPIO port mode register (GPIOx_MODER). (Ref: RM0090 Reference Manual - Sec. 8.4.1).
 // * The mode register is 32 bits and serves 16 GPIO pins with two bits per pin (4 modes).
 // * 'General Output Mode' is 01.
 // * Create a bit mask for each PD 12-15. NB: This is double the PD as the mode register is 2 bits. 
-#define GREEN_BIT (1U << 24)
-#define ORANGE_BIT (1U << 26)
-#define RED_BIT (1U << 28)
-#define BLUE_BIT (1U << 30)
+#define ENABLE_GREEN_LED (1U << 24)
+#define ENABLE_ORANGE_LED (1U << 26)
+#define ENABLE_RED_LED (1U << 28)
+#define BENABLE_BLUE_LED (1U << 30)
 
 // GPIO port output data register (GPIOx_ODR). (Ref: RM0090 Reference Manual - Sec. 8.4.6).
 // Create a bit mask by shifting an unsigned int the required number of positions.
@@ -57,16 +57,58 @@
 #define RED (1U << 14)
 #define BLUE (1U << 15)
 
+// Volatile variables are variables that change without the code changing them, e.g. clock tick counter.
+// The volatile keyword, stops the compiler optimising out the variable when it detects no programmatic changes.
+//
+// Whenever the SysTick interrupt is raised the tick will be incremented in the exception handler.
+volatile uint32_t tick;
+volatile uint32_t _tick;
+	
+void gpio_init(void);
+void DelayS(uint32_t seconds);
 
 int main() {
-	// Reset and Clock Control - Set the RCC AHB1 peripheral clock register to enable the GPIOD port.
-	RCC->AHB1ENR |= GPIOD_CLOCK;
-	
-	// GPIOD Port -  Set the MODER register to enable 
-	GPIOD->MODER |= GREEN_BIT | ORANGE_BIT | RED_BIT | BLUE_BIT;
-	
+	gpio_init();
 	while (1) {
 		// GPIOD Port - set the GPIO port output data register to on.
-		GPIOD->ODR |=  GREEN | ORANGE | RED | BLUE;
+		// GPIOD->ODR |=  GREEN | ORANGE | RED | BLUE;	// Bitwise set operator.
+		GPIOD->ODR ^= GREEN | ORANGE | RED | BLUE; 		  // Bitwise toggle operator.
+		DelayS(1);
 	}
+}
+
+void gpio_init() {
+	// Enable Registers
+	
+	// Reset and Clock Control - Set the RCC AHB1 peripheral clock register to enable the GPIOD port.
+	RCC->AHB1ENR |= ENABLE_GPIOD_CLOCK;
+	// GPIOD Port -  Set the MODER register to enable 
+	GPIOD->MODER |= ENABLE_GREEN_LED | ENABLE_ORANGE_LED | ENABLE_RED_LED | BENABLE_BLUE_LED;
+	
+	// Enable CMSIS SysTick clock interrupts
+	
+	// Add a time-base with SysTick. SysTick is available through the CMSIS hardware abstraction layer.
+	// The cortx M4 runs in the MHz range, so divding by 100U causes clock interupts to occur every 10 millisecond.
+	SysTick_Config(SystemCoreClock/100U);
+	// Enable interupts.
+	__enable_irq();
+}
+
+
+void SysTick_Handler() {
+	++tick;
+}
+
+uint32_t getTick(void) {
+	__disable_irq();
+	_tick = tick; // Critical Section - 3 assembler instructions. To ensure it executes atomically, interrupts are temporarilly disabled.
+	__enable_irq();	 
+	return _tick;
+}
+
+void DelayS(uint32_t seconds) {
+	seconds *= 100;
+	uint32_t temp = getTick();
+	while ((getTick() - temp) < seconds) {}
+	
 }
