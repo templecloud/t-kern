@@ -65,7 +65,7 @@ volatile uint32_t tick;
 volatile uint32_t _tick;
 	
 void gpio_init(void);
-void DelayS(uint32_t seconds);
+void DelayMillis(uint32_t millis);
 
 int main() {
 	gpio_init();
@@ -73,7 +73,7 @@ int main() {
 		// GPIOD Port - set the GPIO port output data register to on.
 		// GPIOD->ODR |=  GREEN | ORANGE | RED | BLUE;	// Bitwise set operator.
 		GPIOD->ODR ^= GREEN | ORANGE | RED | BLUE; 		  // Bitwise toggle operator.
-		DelayS(1);
+		DelayMillis(500);
 	}
 }
 
@@ -88,27 +88,27 @@ void gpio_init() {
 	// Enable CMSIS SysTick clock interrupts
 	
 	// Add a time-base with SysTick. SysTick is available through the CMSIS hardware abstraction layer.
-	// The cortx M4 runs in the MHz range, so divding by 100U causes clock interupts to occur every 10 millisecond.
-	SysTick_Config(SystemCoreClock/100U);
+	// The cortex M4 runs in the MHz range, so divding by 1000U causes clock interupts to occur every millisecond.
+	// https://www.keil.com/pack/doc/CMSIS/Core/html/group__SysTick__gr.html
+	SysTick_Config(SystemCoreClock/1000U);
 	// Enable interupts.
 	__enable_irq();
 }
 
-
+// NB: This function is also implemented by the STM32 HAL libraries, along with delay functions, etc.
 void SysTick_Handler() {
 	++tick;
 }
 
 uint32_t getTick(void) {
 	__disable_irq();
-	_tick = tick; // Critical Section - 3 assembler instructions. To ensure it executes atomically, interrupts are temporarilly disabled.
+	_tick = tick; // Critical Section - Multiple assembler instructions. To ensure it executes atomically, interrupts are temporarilly disabled.
 	__enable_irq();	 
 	return _tick;
 }
 
-void DelayS(uint32_t seconds) {
-	seconds *= 100;
+void DelayMillis(uint32_t millis) {
 	uint32_t temp = getTick();
-	while ((getTick() - temp) < seconds) {}
+	while ((getTick() - temp) < millis) {}
 	
 }
