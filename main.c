@@ -67,15 +67,98 @@ volatile uint32_t _tick;
 void gpio_init(void);
 void DelayMillis(uint32_t millis);
 
+enum LEDState {
+	ON, OFF, TOGGLE
+};
+
+void setAll(enum LEDState state);
+void setBlue(enum LEDState state);
+void setOrange(enum LEDState state);
+void setRed(enum LEDState state);
+void setGreen(enum LEDState state);
+
 int main() {
 	gpio_init();
 	while (1) {
-		// GPIOD Port - set the GPIO port output data register to on.
-		// GPIOD->ODR |=  GREEN | ORANGE | RED | BLUE;	// Bitwise set operator.
-		GPIOD->ODR ^= GREEN | ORANGE | RED | BLUE; 		  // Bitwise toggle operator.
+		setAll(TOGGLE);
 		DelayMillis(500);
 	}
 }
+
+
+void setAll(enum LEDState state) {
+	switch (state) {
+		case ON:
+			// GPIOD Port - set the GPIO port output data register to on.
+			GPIOD->ODR |= GREEN | ORANGE | RED | BLUE;
+			break;
+		case OFF:
+			// GPIOD Port - set the GPIO port output data register to off.
+			GPIOD->ODR &= ~GREEN | ORANGE | RED | BLUE;
+			break;
+		case TOGGLE:
+			GPIOD->ODR ^= GREEN | ORANGE | RED | BLUE;; 
+			break;
+	}
+}
+
+void setBlue(enum LEDState state) {
+	switch (state) {
+		case ON:
+			GPIOD->ODR |= BLUE;
+			break;
+		case OFF:
+			GPIOD->ODR &= ~BLUE; 
+			break;
+		case TOGGLE:
+			GPIOD->ODR ^= BLUE; 
+			break;
+	}
+}
+
+
+void setOrange(enum LEDState state) {
+	switch (state) {
+		case ON:
+			GPIOD->ODR |= ORANGE;
+			break;
+		case OFF:
+			GPIOD->ODR &= ~ORANGE; 
+			break;
+		case TOGGLE:
+			GPIOD->ODR ^= ORANGE; 
+			break;
+	}
+}
+
+void setRed(enum LEDState state) {
+	switch (state) {
+		case ON:
+			GPIOD->ODR |= RED;
+			break;
+		case OFF:
+			GPIOD->ODR &= ~RED; 
+			break;
+		case TOGGLE:
+			GPIOD->ODR ^= RED; 
+			break;
+	}
+}
+
+void setGreen(enum LEDState state) {
+	switch (state) {
+		case ON:
+			GPIOD->ODR |= GREEN;
+			break;
+		case OFF:
+			GPIOD->ODR &= ~GREEN; 
+			break;
+		case TOGGLE:
+			GPIOD->ODR ^= GREEN; 
+			break;
+	}
+}
+
 
 void gpio_init() {
 	// Enable Registers
