@@ -64,7 +64,7 @@
 volatile uint32_t tick;
 volatile uint32_t _tick;
 	
-void gpio_init(void);
+void GPIO_Init(void);
 void DelayMillis(uint32_t millis);
 
 enum LEDState {
@@ -77,14 +77,17 @@ void setOrange(enum LEDState state);
 void setRed(enum LEDState state);
 void setGreen(enum LEDState state);
 
+// main              - is the 'forground'.
+// SysTick_Handler[] - is 'interupt service handler/routine' in the 'background'.
 int main() {
-	gpio_init();
+	GPIO_Init();
 	while (1) {
-		setAll(TOGGLE);
+		setBlue(ON);
+		DelayMillis(500);
+		setBlue(OFF);
 		DelayMillis(500);
 	}
 }
-
 
 void setAll(enum LEDState state) {
 	switch (state) {
@@ -115,7 +118,6 @@ void setBlue(enum LEDState state) {
 			break;
 	}
 }
-
 
 void setOrange(enum LEDState state) {
 	switch (state) {
@@ -160,7 +162,7 @@ void setGreen(enum LEDState state) {
 }
 
 
-void gpio_init() {
+void GPIO_Init() {
 	// Enable Registers
 	
 	// Reset and Clock Control - Set the RCC AHB1 peripheral clock register to enable the GPIOD port.
@@ -190,6 +192,7 @@ uint32_t getTick(void) {
 	return _tick;
 }
 
+// This code is 'blocking'. It just eats up time doing nothing.
 void DelayMillis(uint32_t millis) {
 	uint32_t temp = getTick();
 	while ((getTick() - temp) < millis) {}
