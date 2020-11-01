@@ -77,14 +77,49 @@ void setOrange(enum LEDState state);
 void setRed(enum LEDState state);
 void setGreen(enum LEDState state);
 
+int green_main(void);
+int blue_main(void);
+
+// uVision - 'Options for Target' -> Floating Point Hardware : Not used. 
+
 // main              - is the 'forground'.
 // SysTick_Handler[] - is 'interupt service handler/routine' in the 'background'.
 int main() {
 	GPIO_Init();
+	// stop the compiler optimising out 'green_main'.
+	uint32_t volatile start = 0U;
+	if (start) {
+		blue_main();
+	} else {
+		green_main();
+	}
+	while(1) {}
+	/*
 	while (1) {
 		setBlue(ON);
 		DelayMillis(500);
 		setBlue(OFF);
+		DelayMillis(500);
+	}
+	*/
+}
+
+int blue_main() {
+	// The while loop is what makes it like a thread / main function.
+	while (1) {
+		setBlue(ON);
+		DelayMillis(500);
+		setBlue(OFF);
+		DelayMillis(500);
+	}
+}
+
+int green_main() {
+	// The while loop is what makes it like a thread / main function.
+	while (1) {
+		setGreen(ON);
+		DelayMillis(500);
+		setGreen(OFF);
 		DelayMillis(500);
 	}
 }
@@ -166,7 +201,7 @@ void GPIO_Init() {
 	// Enable Registers
 	
 	// Reset and Clock Control - Set the RCC AHB1 peripheral clock register to enable the GPIOD port.
-	RCC->AHB1ENR |= ENABLE_GPIOD_CLOCK;
+	RCC->AHB1ENR |= ENABLE_GPIO_CLOCK;
 	// GPIOD Port -  Set the MODER register to enable 
 	GPIOD->MODER |= ENABLE_GREEN_LED | ENABLE_ORANGE_LED | ENABLE_RED_LED | BENABLE_BLUE_LED;
 	
@@ -180,6 +215,25 @@ void GPIO_Init() {
 	__enable_irq();
 }
 
+
+// This is 'interupt service handler/routine'. It run in the 'background'.
+//
+// We can break-point here to manually make a context switch using the debugger.
+//
+// 1. The PC register 'stack pointer' contains a reference to the memory location of the next instruction.
+// 2. The SP register 'stack pointer' contains a reference to the memory location of the current stack..
+//
+// When an interupt occurs on a Cortex M processor, the content of some registers are saved onto the stack.
+// The stack is a memory region in the RAM. These can be used re-instate the originl execution when the interupt
+// service handler has finished executing.
+//
+// When the processor takes an exception, unless the exception is a tail-chained or a late-arriving
+// exception, the processor pushes information onto the current stack. This operation is referred to
+// as 'stacking' and the structure of eight data words is referred as the 'stack frame'.
+// (Ref: Cortex M4 User Guide - Sec. 2.3.7)
+//
+// We can break point here, and, update the captured stack frame PC and set it to the desired LED main function.
+//
 // NB: This function is also implemented by the STM32 HAL libraries, along with delay functions, etc.
 void SysTick_Handler() {
 	++tick;
@@ -187,7 +241,7 @@ void SysTick_Handler() {
 
 uint32_t getTick(void) {
 	__disable_irq();
-	_tick = tick; // Critical Section - Multiple assembler instructions. To ensure it executes atomically, interrupts are temporarilly disabled.
+	_tick = tick; // Critical Section - Multiple assembler instructions. To ensure it executes atomically, interrupts are temporarily disabled.
 	__enable_irq();	 
 	return _tick;
 }
