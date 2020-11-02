@@ -77,8 +77,15 @@ void setOrange(enum LEDState state);
 void setRed(enum LEDState state);
 void setGreen(enum LEDState state);
 
-int green_main(void);
-int blue_main(void);
+uint32_t green_thread_stack[40];
+// We initialise and load the stack (and stack frame registers) from the bottom up, so we take the last element.
+uint32_t *green_thread_stack_ptr = &green_thread_stack[40];	
+int green_thread(void);
+
+uint32_t blue_thread_stack[40];
+// We initialise and load the stack (and stack frame registers) from the bottom up, so we take the last element.
+uint32_t *blue_thread_stack_ptr = &blue_thread_stack[40]; 	// After initialisation point to top of stack.
+int blue_thread(void);
 
 // uVision - 'Options for Target' -> Floating Point Hardware : Not used. 
 
@@ -87,12 +94,47 @@ int blue_main(void);
 int main() {
 	GPIO_Init();
 	// stop the compiler optimising out 'green_main'.
+	/*
 	uint32_t volatile start = 0U;
 	if (start) {
-		blue_main();
+		blue_thread();
 	} else {
-		green_main();
+		green_thread();
 	}
+	*/
+	
+	// Create a 'blue thread' stack frame for the C-M4 registers. 
+	// * Each register is 32 bits (unint32).
+	// * The stack frame is loaded backwards as the C-M4 hangs the stack in memory, hiagh to low.
+	//
+	// xPSR register needs bit 24 set to 1 to enabled 'thumb mode'.
+	*(--blue_thread_stack_ptr) = (1U << 24);		
+	// PC register is set to point to the 'blue_thread' function.	
+	*(--blue_thread_stack_ptr) = (uint32_t) &blue_thread;	
+	// The reamining registers are set to default values.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // LR register.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // R12 register.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // R3 register.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // R2 register.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // R1 register.
+	*(--blue_thread_stack_ptr) = 0x0000DEADU; // R1 register.
+	
+	// Create a 'green thread' stack frame for the C-M4 registers. 
+	// * Each register is 32 bits (unint32).
+	// * The stack frame is loaded backwards as the C-M4 hangs the stack in memory, hiagh to low.
+	//
+	// xPSR register needs bit 24 set to 1 to enabled 'thumb mode'.
+	*(--green_thread_stack_ptr) = (1U << 24);		
+	// PC register is set to point to the 'green_thread' function.	
+	*(--green_thread_stack_ptr) = (uint32_t) &green_thread;	
+	// The reamining registers are set to default values.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // LR register.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // R12 register.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // R3 register.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // R2 register.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // R1 register.
+	*(--green_thread_stack_ptr) = 0x0000BEEFU; // R1 register.
+	
 	while(1) {}
 	/*
 	while (1) {
@@ -102,9 +144,10 @@ int main() {
 		DelayMillis(500);
 	}
 	*/
+	
 }
 
-int blue_main() {
+int blue_thread() {
 	// The while loop is what makes it like a thread / main function.
 	while (1) {
 		setBlue(ON);
@@ -114,7 +157,7 @@ int blue_main() {
 	}
 }
 
-int green_main() {
+int green_thread() {
 	// The while loop is what makes it like a thread / main function.
 	while (1) {
 		setGreen(ON);
@@ -201,7 +244,7 @@ void GPIO_Init() {
 	// Enable Registers
 	
 	// Reset and Clock Control - Set the RCC AHB1 peripheral clock register to enable the GPIOD port.
-	RCC->AHB1ENR |= ENABLE_GPIO_CLOCK;
+	RCC->AHB1ENR |= ENABLE_GPIOD_CLOCK;
 	// GPIOD Port -  Set the MODER register to enable 
 	GPIOD->MODER |= ENABLE_GREEN_LED | ENABLE_ORANGE_LED | ENABLE_RED_LED | BENABLE_BLUE_LED;
 	
@@ -232,7 +275,10 @@ void GPIO_Init() {
 // as 'stacking' and the structure of eight data words is referred as the 'stack frame'.
 // (Ref: Cortex M4 User Guide - Sec. 2.3.7)
 //
-// We can break point here, and, update the captured stack frame PC and set it to the desired LED main function.
+// We can break point here to:
+// 1. Update the captured stack frame PC from memory and set it to the desired LED main function.
+// 2. Update the the SP register and in memory stack frame SP memory locations (for each 'thread').
+// 
 //
 // NB: This function is also implemented by the STM32 HAL libraries, along with delay functions, etc.
 void SysTick_Handler() {
